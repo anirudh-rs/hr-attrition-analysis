@@ -258,32 +258,24 @@ Download these three datasets from Kaggle and place them in `data/`:
 
 
 
-\### 5. Run the pipeline
-
+### 5. Run the project
 ```bash
-
-python src/build\_dataset.py
-
-python src/preprocess.py
-
-python src/train\_model.py
-
-python src/tune\_threshold.py
-
-python src/explain.py
-
+python run.py
 ```
 
+This smart launcher automatically checks if all model files exist.
+If they do, it skips training and launches the dashboard directly.
+If any files are missing, it runs the full pipeline first then launches.
 
-
-\### 6. Launch the dashboard
-
-```bash
-
-streamlit run app/dashboard.py
-
-```
-
+> **Manual pipeline** (only needed if you want to retrain individually):
+> ```bash
+> python src/build_dataset.py
+> python src/preprocess.py
+> python src/train_model.py
+> python src/tune_threshold.py
+> python src/explain.py
+> streamlit run app/dashboard.py
+> ```
 
 
 \---
