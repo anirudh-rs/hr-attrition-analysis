@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Conda
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Model files (large binaries)
+models/*.pkl
+
+# Keep PNG outputs
+!models/*.png
+
+# Data files (too large for GitHub)
+data/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+fix_dashboard.py
+check_files.py
+explore_columns.py
