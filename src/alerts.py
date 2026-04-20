@@ -10,10 +10,8 @@ def get_department_alerts(predictions_path='models/predictions.csv'):
         AvgRiskScore=('AttritionRisk', 'mean'),
         AvgIncome=('MonthlyIncome', 'mean'),
         PctOvertime=('OverTime', lambda x: (
-            x.map({'Yes': 1, 'No': 0})
-            if x.dtype == 'object'
-            else x
-        ).mean())
+            x.map({'Yes': 1, 'No': 0}).astype(float).mean()
+        ))
     ).reset_index().sort_values('HighRiskCount', ascending=False)
 
     dept_summary['AvgRiskScore'] = dept_summary['AvgRiskScore'].round(3)
