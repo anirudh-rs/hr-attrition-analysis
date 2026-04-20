@@ -4,8 +4,23 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import joblib
-import os
 import sys
+import os
+
+# Add both the project root and app folder to path
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+APP  = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, APP)
+
+from theme import (
+    PRIMARY, PRIMARY_LIGHT, HIGH_RISK, MEDIUM_RISK, LOW_RISK,
+    CHART_MAIN, CHART_SEC, CHART_THIRD, CHART_FOURTH,
+    BG, BG_SUBTLE, TEXT_DARK, TEXT_MID, PLOTLY_BASE,
+    AXIS_STYLE, RISK_COLOR_MAP, GREEN_SEQ
+)
+from src.alerts import get_department_alerts
+from src.bls_data import load_bls_data
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.alerts import get_department_alerts
@@ -31,7 +46,7 @@ def load_shap():
     return pd.read_csv('models/shap_values.csv')
 
 pred_df, raw_df = load_data()
-color_map = {'High': '#e74c3c', 'Medium': '#f39c12', 'Low': '#2ecc71'}
+color_map = RISK_COLOR_MAP
 
 with st.sidebar:
     st.title("👥 HR Attrition Analytics")
@@ -100,12 +115,24 @@ with tab1:
     with c1:
         risk_counts = filtered['RiskLabel'].value_counts().reset_index()
         risk_counts.columns = ['Risk', 'Count']
-        fig = px.pie(
-            risk_counts, names='Risk', values='Count',
-            hole=0.5, title='Risk Level Distribution',
-            color='Risk', color_discrete_map=color_map
+        fig = go.Figure(go.Pie(
+            labels=risk_counts['Risk'],
+            values=risk_counts['Count'],
+            hole=0.6,
+            marker=dict(
+                colors=[RISK_COLOR_MAP.get(r, '#ccc') for r in risk_counts['Risk']],
+                line=dict(color='#FFFFFF', width=2)
+            ),
+            textinfo='label+percent',
+            textfont=dict(size=11, color=TEXT_DARK),
+            hovertemplate='<b>%{label}</b><br>%{value} employees<extra></extra>'
+        ))
+        fig.update_layout(
+            **PLOTLY_BASE,
+            title='Risk Level Distribution',
+            height=350,
+            legend=dict(orientation='h', y=-0.1, font=dict(size=10))
         )
-        fig.update_layout(height=350)
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
@@ -113,14 +140,27 @@ with tab1:
             lambda x: (x == 'Yes').mean() * 100
         ).reset_index()
         dept_rate.columns = ['Department', 'AttritionRate']
-        fig2 = px.bar(
-            dept_rate, x='Department', y='AttritionRate',
-            title='Historical Attrition Rate by Department (%)',
-            color='AttritionRate', color_continuous_scale='Reds',
-            text=dept_rate['AttritionRate'].round(1).astype(str) + '%'
+        dept_rate = dept_rate.sort_values('AttritionRate', ascending=True)
+        fig2 = go.Figure(go.Bar(
+            x=dept_rate['AttritionRate'],
+            y=dept_rate['Department'],
+            orientation='h',
+            marker=dict(
+                color=dept_rate['AttritionRate'],
+                colorscale=GREEN_SEQ,
+                showscale=False
+            ),
+            text=dept_rate['AttritionRate'].round(1).astype(str) + '%',
+            textposition='outside',
+            textfont=dict(size=11, color=TEXT_DARK)
+        ))
+        fig2.update_layout(
+            **PLOTLY_BASE,
+            title='Attrition Rate by Department (%)',
+            height=350,
+            xaxis=dict(**AXIS_STYLE, showticklabels=False),
+            yaxis=dict(**AXIS_STYLE)
         )
-        fig2.update_traces(textposition='outside')
-        fig2.update_layout(height=350, showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
     c3, c4 = st.columns(2)
@@ -128,33 +168,49 @@ with tab1:
     with c3:
         stayed = raw_df[raw_df['Attrition'] == 'No']['Age']
         left   = raw_df[raw_df['Attrition'] == 'Yes']['Age']
-
         fig3 = go.Figure()
         fig3.add_trace(go.Box(
             y=stayed, name='Stayed',
-            marker_color='#2ecc71',
-            boxmean=True
+            marker_color=LOW_RISK,
+            boxmean=True,
+            line=dict(color=LOW_RISK)
         ))
         fig3.add_trace(go.Box(
             y=left, name='Left',
-            marker_color='#e74c3c',
-            boxmean=True
+            marker_color=HIGH_RISK,
+            boxmean=True,
+            line=dict(color=HIGH_RISK)
         ))
         fig3.update_layout(
+            **PLOTLY_BASE,
             title='Age Distribution by Attrition',
             height=320,
-            yaxis_title='Age',
-            showlegend=True
+            yaxis=dict(**AXIS_STYLE, title='Age'),
+            xaxis=dict(**AXIS_STYLE),
+            legend=dict(orientation='h', y=1.1, font=dict(size=10))
         )
         st.plotly_chart(fig3, use_container_width=True)
 
     with c4:
-        fig4 = px.box(
-            raw_df, x='Attrition', y='MonthlyIncome',
-            color='Attrition', title='Monthly Income vs Attrition',
-            color_discrete_map={'Yes': '#e74c3c', 'No': '#2ecc71'}
+        fig4 = go.Figure()
+        for val, color, name in [('No', LOW_RISK, 'Stayed'), ('Yes', HIGH_RISK, 'Left')]:
+            subset = raw_df[raw_df['Attrition'] == val]
+            fig4.add_trace(go.Box(
+                y=subset['MonthlyIncome'],
+                name=name,
+                marker_color=color,
+                boxmean=True,
+                line=dict(color=color)
+            ))
+        fig4.update_layout(
+            **PLOTLY_BASE,
+            title='Monthly Income vs Attrition',
+            height=320,
+            yaxis=dict(**AXIS_STYLE, title='Monthly Income ($)'),
+            xaxis=dict(**AXIS_STYLE),
+            showlegend=True,
+            legend=dict(orientation='h', y=-0.15, font=dict(size=10))
         )
-        fig4.update_layout(height=320, showlegend=False)
         st.plotly_chart(fig4, use_container_width=True)
 
     role_dept = raw_df.groupby(['Department', 'JobRole'])['Attrition'].apply(
@@ -166,9 +222,16 @@ with tab1:
         x='AttritionRate', y='JobRole',
         color='Department',
         title='Attrition Rate by Job Role (%)',
-        orientation='h'
+        orientation='h',
+        color_discrete_sequence=[CHART_MAIN, CHART_SEC, CHART_THIRD]
     )
-    fig5.update_layout(height=400)
+    fig5.update_layout(
+        **PLOTLY_BASE,
+        height=400,
+        xaxis=dict(**AXIS_STYLE, title='Attrition Rate (%)'),
+        yaxis=dict(**AXIS_STYLE),
+        legend=dict(orientation='h', y=1.02, font=dict(size=10))
+    )
     st.plotly_chart(fig5, use_container_width=True)
 
 with tab2:
@@ -177,22 +240,54 @@ with tab2:
     c1, c2 = st.columns([2, 1])
 
     with c1:
-        fig = px.scatter(
-            filtered,
-            x='MonthlyIncome', y='AttritionRisk',
-            color='RiskLabel', color_discrete_map=color_map,
-            hover_data=['JobRole', 'Department', 'YearsAtCompany'],
-            title='Monthly Income vs Attrition Risk Score'
+        fig = go.Figure()
+        for risk_level, color in RISK_COLOR_MAP.items():
+            subset = filtered[filtered['RiskLabel'] == risk_level]
+            if len(subset) == 0:
+                continue
+            fig.add_trace(go.Scatter(
+                x=subset['MonthlyIncome'],
+                y=subset['AttritionRisk'],
+                mode='markers',
+                name=risk_level,
+                marker=dict(
+                    color=color,
+                    size=6,
+                    opacity=0.7,
+                    line=dict(width=0.5, color='white')
+                ),
+                customdata=subset[['JobRole', 'Department', 'YearsAtCompany']].values,
+                hovertemplate=(
+                    '<b>%{customdata[1]}</b><br>'
+                    'Role: %{customdata[0]}<br>'
+                    'Income: $%{x:,.0f}<br>'
+                    'Risk Score: %{y:.3f}<br>'
+                    'Tenure: %{customdata[2]} yrs'
+                    '<extra></extra>'
+                )
+            ))
+        fig.add_hline(
+            y=0.60, line_dash='dot',
+            line_color=HIGH_RISK, line_width=1.5,
+            opacity=0.7,
+            annotation_text='High Risk (0.60)',
+            annotation_font=dict(size=10, color=HIGH_RISK)
         )
         fig.add_hline(
-            y=0.60, line_dash='dash', line_color='red',
-            opacity=0.5, annotation_text='High Risk (0.60)'
+            y=0.29, line_dash='dot',
+            line_color=MEDIUM_RISK, line_width=1.5,
+            opacity=0.7,
+            annotation_text='Model Threshold (0.29)',
+            annotation_font=dict(size=10, color=MEDIUM_RISK)
         )
-        fig.add_hline(
-            y=0.29, line_dash='dash', line_color='orange',
-            opacity=0.5, annotation_text='Model Threshold (0.29)'
+        fig.update_layout(
+            **PLOTLY_BASE,
+            title='Monthly Income vs Attrition Risk Score',
+            height=400,
+            xaxis=dict(**AXIS_STYLE, title='Monthly Income ($)'),
+            yaxis=dict(**AXIS_STYLE, title='Risk Score'),
+            legend=dict(orientation='h', y=1.1, font=dict(size=10))
         )
-        fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
@@ -200,13 +295,26 @@ with tab2:
             'OverTime_label'
         )['AttritionRisk'].mean().reset_index()
         ot_risk.columns = ['OverTime', 'AvgRisk']
-        fig2 = px.bar(
-            ot_risk, x='OverTime', y='AvgRisk',
-            title='Avg Risk by Overtime',
-            color='OverTime',
-            color_discrete_map={'Yes': '#e74c3c', 'No': '#2ecc71'}
+        fig2 = go.Figure(go.Bar(
+            x=ot_risk['OverTime'],
+            y=ot_risk['AvgRisk'],
+            marker=dict(
+                color=[HIGH_RISK if ot == 'Yes' else LOW_RISK
+                       for ot in ot_risk['OverTime']],
+                line=dict(width=0)
+            ),
+            text=ot_risk['AvgRisk'].round(3),
+            textposition='outside',
+            textfont=dict(size=11, color=TEXT_DARK)
+        ))
+        fig2.update_layout(
+            **PLOTLY_BASE,
+            title='Avg Risk Score by Overtime',
+            height=300,
+            xaxis=dict(**AXIS_STYLE),
+            yaxis=dict(**AXIS_STYLE, range=[0, 0.7]),
+            showlegend=False
         )
-        fig2.update_layout(height=300, showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown("### 🔴 High Risk Employee List")
@@ -304,7 +412,12 @@ with tab3:
                     "Mean |SHAP|",
                     min_value=0,
                     max_value=float(mean_shap['Mean |SHAP|'].max()),
-                    format="%.4f"
+                    format="%.4f",
+                    help="Higher value = stronger influence on attrition prediction"
+                ),
+                "Source": st.column_config.TextColumn(
+                    "Source",
+                    help="Original = IBM dataset | Enriched = HRv14/Burnout | Engineered = computed feature"
                 )
             }
         )
@@ -343,14 +456,34 @@ with tab4:
 
     st.markdown("---")
 
-    fig = px.bar(
-        dept_summary, x='Department', y='HighRiskCount',
-        color='AvgRiskScore', color_continuous_scale='Reds',
-        title='High Risk Count by Department',
-        text='HighRiskCount'
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=dept_summary['Department'],
+        y=dept_summary['HighRiskCount'],
+        marker=dict(
+            color=dept_summary['AvgRiskScore'],
+            colorscale=GREEN_SEQ,
+            showscale=True,
+            colorbar=dict(
+                title='Avg Risk',
+                thickness=12,
+                len=0.6,
+                tickfont=dict(size=9, color=TEXT_MID)
+            ),
+            line=dict(width=0)
+        ),
+        text=dept_summary['HighRiskCount'],
+        textposition='outside',
+        textfont=dict(size=13, color=TEXT_DARK)
+    ))
+    fig.update_layout(
+        **PLOTLY_BASE,
+        title='High Risk Employee Count by Department',
+        height=380,
+        xaxis=dict(**AXIS_STYLE),
+        yaxis=dict(**AXIS_STYLE, title='High Risk Count'),
+        showlegend=False
     )
-    fig.update_traces(textposition='outside')
-    fig.update_layout(height=380)
     st.plotly_chart(fig, use_container_width=True)
 
     st.warning("""
@@ -385,19 +518,31 @@ with tab5:
     c1, c2 = st.columns([3, 1])
 
     with c1:
-        fig = px.bar(
-            combined,
-            x='QuitRate', y='Industry',
-            color='Type', orientation='h',
+        fig = go.Figure()
+        for type_label, color in [
+            ('National Average', CHART_SEC),
+            ('Our Company',      PRIMARY)
+        ]:
+            subset = combined[combined['Type'] == type_label]
+            fig.add_trace(go.Bar(
+                x=subset['QuitRate'],
+                y=subset['Industry'],
+                name=type_label,
+                orientation='h',
+                marker=dict(color=color, line=dict(width=0)),
+                text=subset['QuitRate'].astype(str) + '%',
+                textposition='outside',
+                textfont=dict(size=10, color=TEXT_DARK)
+            ))
+        fig.update_layout(
+            **PLOTLY_BASE,
             title='Monthly Quit Rate Comparison (%)',
-            color_discrete_map={
-                'National Average': '#3498db',
-                'Our Company':      '#e74c3c'
-            },
-            text=combined['QuitRate'].astype(str) + '%'
+            height=380,
+            barmode='group',
+            xaxis=dict(**AXIS_STYLE, title='Monthly Quit Rate (%)'),
+            yaxis=dict(**AXIS_STYLE),
+            legend=dict(orientation='h', y=1.1, font=dict(size=10))
         )
-        fig.update_traces(textposition='outside')
-        fig.update_layout(height=380)
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
@@ -405,10 +550,10 @@ with tab5:
         diff         = our_rate - avg_national
         direction    = "above" if diff > 0 else "below"
 
-        st.metric("Our Predicted Rate",  f"{our_rate:.1f}%")
-        st.metric("National Average",    f"{avg_national:.1f}%")
-        st.metric("Variance",
-                  f"{abs(diff):.1f}% {direction} avg")
+        st.metric("Our Predicted Rate", f"{our_rate:.1f}%")
+        st.metric("National Average", f"{avg_national:.1f}%")
+        st.metric("Variance", f"{abs(diff):.1f}%")
+        st.caption(f"{direction} national average")
 
     st.markdown("### Detailed Comparison")
     bls_table = pd.DataFrame([
