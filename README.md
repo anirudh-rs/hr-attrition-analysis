@@ -27,7 +27,7 @@ A machine learning project that predicts which employees are likely to leave, id
 | Data Pipeline | Pandas, NumPy, Scikit-learn |
 | External API | US Bureau of Labor Statistics (BLS) |
 | Deployment | Streamlit Community Cloud |
-| Visualisation | Tableau Public |
+| Visualisation | Streamlit Dashboard |
 
 ---
 
