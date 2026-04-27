@@ -3,8 +3,6 @@
 A machine learning project that predicts which employees are likely to leave, identifies the key drivers behind attrition, and presents findings in an interactive dashboard built for HR teams.
 
 🔗 **Live Demo:** [HR Attrition Intelligence Dashboard](https://hr-attrition-analytics-dashboard.streamlit.app/)
-🔗 **Tableau Public:** *(link to be added)*
-
 ---
 
 ## Live Features
@@ -183,12 +181,3 @@ beyond the model's internal scores.
 A model that produces a score without a reason is difficult to trust and impossible
 to act on. SHAP values turn the black box into an explainable tool that HR managers
 can use and defend in real conversations.
-
----
-
-## Roadmap
-
-- [ ] Tableau Public dashboard — combined view of all 6 sheets
-- [ ] Employee what-if simulator — adjust features and see risk score change live
-- [ ] Email alert digest — weekly high-risk summary for department managers
-- [ ] Docker containerization for self-hosted deployment
